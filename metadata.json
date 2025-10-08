@@ -1,0 +1,7 @@
+{
+  "name": "Hackathon Fusion",
+  "description": "A comprehensive, AI-powered platform to automate and manage hackathons seamlessly. It provides tools for organizers, participants, mentors, and judges to streamline the entire event lifecycle from registration to final judging.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
