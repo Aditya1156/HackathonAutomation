@@ -78,3 +78,48 @@ export interface Attraction {
   activities: string[];
   gettingThere: string;
 }
+
+// Judging System Types
+export type JudgingRound = 'Round 1' | 'Round 2' | 'Final';
+
+export interface JudgingCriteria {
+  progress: number;      // Out of 10
+  ui: number;           // Out of 10
+  presentation: number; // Out of 10
+  idea: number;         // Out of 10
+  implementation: number; // Out of 10
+}
+
+export interface JudgeEvaluation {
+  judgeId: string;
+  judgeName: string;
+  round: JudgingRound;
+  teamId: string;
+  criteria: JudgingCriteria;
+  comments?: string;
+  totalScore: number;    // Sum of all criteria
+  evaluatedAt: string;   // ISO date string
+}
+
+export interface Judge {
+  id: string;
+  name: string;
+  email: string;
+  designation: string;
+  organization: string;
+  expertise: string[];
+  profilePictureUrl?: string;
+  assignedRounds: JudgingRound[];
+  assignedTeams?: string[]; // Team IDs
+}
+
+export interface TeamScores {
+  teamId: string;
+  teamName: string;
+  evaluations: JudgeEvaluation[];
+  averageScoreByRound: {
+    [key in JudgingRound]?: number;
+  };
+  totalAverageScore: number;
+  rank?: number;
+}

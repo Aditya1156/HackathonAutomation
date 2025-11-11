@@ -5,9 +5,11 @@ import TeamsPage from './MentorJudgePage';
 import QRScanPage from './QRScanPage';
 import SubmissionsPage from './SubmissionsPage';
 import SettingsPage from './SettingsPage';
-import { HomeIcon, UsersIcon, QrcodeIcon, ClipboardCheckIcon, CogIcon, ChevronDoubleLeftIcon } from '../components/IconComponents';
+import JuryPortal from './JuryPortal';
+import { HomeIcon, UsersIcon, QrcodeIcon, ClipboardCheckIcon, CogIcon, ChevronDoubleLeftIcon, ScaleIcon } from '../components/IconComponents';
+import { mockTeams } from '../services/mockData';
 
-type AdminView = 'dashboard' | 'teams' | 'submissions' | 'scanner' | 'settings';
+type AdminView = 'dashboard' | 'teams' | 'submissions' | 'scanner' | 'settings' | 'jury';
 
 const sidebarVariants = {
   expanded: { width: '250px' },
@@ -26,6 +28,7 @@ const AdminPortal: React.FC = () => {
     const navItems: { view: AdminView; label: string; icon: ReactNode }[] = [
         { view: 'dashboard', label: 'Dashboard', icon: <HomeIcon className="w-6 h-6" /> },
         { view: 'teams', label: 'Teams', icon: <UsersIcon className="w-6 h-6" /> },
+        { view: 'jury', label: 'Jury Portal', icon: <ScaleIcon className="w-6 h-6" /> },
         { view: 'submissions', label: 'Submissions', icon: <ClipboardCheckIcon className="w-6 h-6" /> },
         { view: 'scanner', label: 'QR Scanner', icon: <QrcodeIcon className="w-6 h-6" /> },
         { view: 'settings', label: 'Settings', icon: <CogIcon className="w-6 h-6" /> },
@@ -35,6 +38,7 @@ const AdminPortal: React.FC = () => {
         switch (currentView) {
             case 'dashboard': return <AdminDashboard />;
             case 'teams': return <TeamsPage />;
+            case 'jury': return <JuryPortal teams={mockTeams} />;
             case 'submissions': return <SubmissionsPage />;
             case 'scanner': return <QRScanPage />;
             case 'settings': return <SettingsPage />;
