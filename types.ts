@@ -111,6 +111,8 @@ export interface Judge {
   profilePictureUrl?: string;
   assignedRounds: JudgingRound[];
   assignedTeams?: string[]; // Team IDs
+  password?: string; // Hashed password for authentication
+  juryId: string; // Unique jury ID (e.g., J001, J002)
 }
 
 export interface TeamScores {

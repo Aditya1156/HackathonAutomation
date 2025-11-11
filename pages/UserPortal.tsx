@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Team, TeamMember } from '../types';
 import { generateProjectIdeas } from '../services/geminiService';
 import { fetchGithubUser, searchGithubUsers } from '../services/githubService';
+import { createTeam, isTeamNameTaken } from '../services/firebaseTeamService';
 import { CheckCircleIcon, TrophyIcon, UserCircleIcon, UsersIcon, WandSparklesIcon, BookOpenIcon, XIcon, CopyIcon, XCircleIcon, UploadCloudIcon, InfoIcon, BrainCircuitIcon, CubeIcon, HeartPulseIcon, BanknotesIcon, LeafIcon, FileTextIcon, ChevronDownIcon, PencilIcon } from '../components/IconComponents';
 import { staggerContainer, fadeInUp } from '../animations/framerVariants';
 import { GlowButton } from '../components/AnimatedComponents';
@@ -46,7 +47,22 @@ const ProfileImageUploader: React.FC<{ imageUrl?: string; onImageSelect: (url: s
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
+        if (file) {
+            // Check file type
+            if (!file.type.startsWith('image/')) {
+                addToast('Please upload a valid image file.', 'error');
+                event.target.value = '';
+                return;
+            }
+            
+            // Check file size (500KB limit for profile pictures)
+            const maxSize = 500 * 1024; // 500KB in bytes
+            if (file.size > maxSize) {
+                addToast(`Image size must be less than 500KB. Current size: ${(file.size / 1024).toFixed(0)}KB`, 'error');
+                event.target.value = '';
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = () => {
                 onImageSelect(reader.result as string);
@@ -189,16 +205,27 @@ const TeamLogoUploader: React.FC<{ imageUrl?: string; onImageSelect: (url: strin
     const addToast = useToast();
 
     const handleFile = useCallback((file: File) => {
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                onImageSelect(reader.result as string);
-                addToast('Team logo uploaded!', 'success');
-            };
-            reader.readAsDataURL(file);
-        } else {
+        if (!file) return;
+        
+        // Check file type
+        if (!file.type.startsWith('image/')) {
             addToast('Please upload a valid image file.', 'error');
+            return;
         }
+        
+        // Check file size (1MB limit for team logo)
+        const maxSize = 1024 * 1024; // 1MB in bytes
+        if (file.size > maxSize) {
+            addToast(`Image size must be less than 1MB. Current size: ${(file.size / 1024).toFixed(0)}KB`, 'error');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+            onImageSelect(reader.result as string);
+            addToast('Team logo uploaded!', 'success');
+        };
+        reader.readAsDataURL(file);
     }, [onImageSelect, addToast]);
 
     const handleDragEnter = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
@@ -239,6 +266,7 @@ const TeamLogoUploader: React.FC<{ imageUrl?: string; onImageSelect: (url: strin
                         <UploadCloudIcon className="w-12 h-12 mb-2" />
                         <p className="font-semibold">Drop your team logo here</p>
                         <p className="text-sm">or click to browse (PNG, JPG)</p>
+                        <p className="text-xs text-cyan-400 mt-1">Max size: 1MB</p>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -437,7 +465,7 @@ const TrackDropdown: React.FC<{ selectedTrack: string; onSelect: (track: string)
     );
 };
 
-const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => void; onFileRemove: () => void; }> = ({ fileUrl, onFileSelect, onFileRemove }) => {
+const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => void; onFileRemove: () => void; error?: string; }> = ({ fileUrl, onFileSelect, onFileRemove, error }) => {
     const [isDragging, setIsDragging] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const addToast = useToast();
@@ -452,16 +480,27 @@ const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => 
     }, [fileUrl]);
 
     const handleFile = useCallback((file: File) => {
-        if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                onFileSelect(reader.result as string);
-                addToast('ID Card uploaded successfully!', 'success');
-            };
-            reader.readAsDataURL(file);
-        } else {
+        if (!file) return;
+        
+        // Check file type
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
             addToast('Please upload an image or PDF file.', 'error');
+            return;
         }
+        
+        // Check file size (1MB limit for institution ID)
+        const maxSize = 1024 * 1024; // 1MB in bytes
+        if (file.size > maxSize) {
+            addToast(`File size must be less than 1MB. Current size: ${(file.size / 1024).toFixed(0)}KB`, 'error');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+            onFileSelect(reader.result as string);
+            addToast('ID Card uploaded successfully!', 'success');
+        };
+        reader.readAsDataURL(file);
     }, [onFileSelect, addToast]);
 
     const handleRemove = (e: React.MouseEvent) => {
@@ -485,7 +524,9 @@ const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => 
 
     return (
         <div>
-            <label className="block mb-2 text-sm font-medium text-slate-300">Upload College ID (Optional)</label>
+            <label className="block mb-2 text-sm font-medium text-slate-300">
+                Upload College ID <span className="text-rose-400">*</span>
+            </label>
             <div
                 onClick={() => inputRef.current?.click()}
                 onDragEnter={handleDragEnter}
@@ -493,7 +534,7 @@ const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => 
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 className={`relative w-full p-6 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300
-                    ${isDragging ? 'border-cyan-400 bg-cyan-500/10' : 'border-purple-500/30 hover:border-cyan-400 hover:bg-slate-800/50'}`}
+                    ${error ? 'border-rose-500 bg-rose-500/10' : isDragging ? 'border-cyan-400 bg-cyan-500/10' : 'border-purple-500/30 hover:border-cyan-400 hover:bg-slate-800/50'}`}
             >
                 <input type="file" ref={inputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileChange} />
                 {fileName ? (
@@ -506,10 +547,21 @@ const FileUploader: React.FC<{ fileUrl?: string; onFileSelect: (url: string) => 
                     <div className="flex flex-col items-center text-slate-400">
                         <UploadCloudIcon className="w-10 h-10 mb-2" />
                         <p className="font-semibold">Drop your ID card file here</p>
-                        <p className="text-sm">(Image or PDF)</p>
+                        <p className="text-sm">(Image or PDF) - Required for verification</p>
+                        <p className="text-xs text-cyan-400 mt-1">Max size: 1MB</p>
                     </div>
                 )}
             </div>
+            {error && (
+                <motion.p 
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-rose-400 text-xs mt-1 flex items-center"
+                >
+                    <XCircleIcon className="w-3 h-3 mr-1" />
+                    {error}
+                </motion.p>
+            )}
         </div>
     );
 };
@@ -535,6 +587,7 @@ const Step1TeamInfo: React.FC<any> = ({ track, setTrack, collegeName, setCollege
                     fileUrl={institutionIdUrl}
                     onFileSelect={(url) => setInstitutionIdUrl(url)}
                     onFileRemove={() => setInstitutionIdUrl(undefined)}
+                    error={errors?.institutionIdUrl}
                 />
             </motion.div>
         </div>
@@ -882,11 +935,135 @@ const ReviewSection: React.FC<{ title: string; onEdit: () => void; children: Rea
 );
 
 const Step4ReviewAndFinalize: React.FC<any> = ({ teamData, onEditStep, accommodation, setAccommodation, paymentConfirmed, setPaymentConfirmed, onBack }) => {
-    const { teamName, track, collegeName, city, address, leader, members, githubUsername, projectSynopsis } = teamData;
+    const { teamName, teamLogoUrl, track, collegeName, city, address, institutionIdUrl, leader, members, githubUsername, projectSynopsis } = teamData;
+    
+    // Data completeness checklist
+    const dataChecklist = [
+        { label: 'Team Name', value: teamName, valid: !!teamName?.trim(), step: 0 },
+        { label: 'Team Logo', value: teamLogoUrl ? 'Uploaded' : 'Not uploaded', valid: !!teamLogoUrl, step: 0, optional: true },
+        { label: 'Track Selected', value: track, valid: !!track, step: 1 },
+        { label: 'College Name', value: collegeName, valid: !!collegeName?.trim(), step: 1 },
+        { label: 'City', value: city, valid: !!city?.trim(), step: 1 },
+        { label: 'Institution ID', value: institutionIdUrl ? 'Uploaded' : 'Not uploaded', valid: !!institutionIdUrl, step: 1 },
+        { label: 'Leader Name', value: leader.name, valid: !!leader.name?.trim(), step: 2 },
+        { label: 'Leader Email', value: leader.email, valid: !!leader.email?.trim(), step: 2 },
+        { label: 'Leader Phone', value: leader.contactNumber, valid: !!leader.contactNumber?.trim(), step: 2 },
+        { label: 'Leader Photo', value: leader.profilePictureUrl ? 'Uploaded' : 'Not uploaded', valid: !!leader.profilePictureUrl, step: 2, optional: true },
+        { label: 'Members', value: `${members.length} member(s)`, valid: true, step: 2, optional: true },
+        { label: 'GitHub Username', value: githubUsername, valid: !!githubUsername?.trim(), step: 3 },
+        { label: 'Project Synopsis', value: projectSynopsis ? `${projectSynopsis.substring(0, 30)}...` : 'Not provided', valid: !!projectSynopsis?.trim(), step: 3 },
+        { label: 'Payment', value: paymentConfirmed ? 'Confirmed' : 'Not confirmed', valid: paymentConfirmed, step: 4 },
+    ];
+    
+    const requiredItems = dataChecklist.filter(item => !item.optional);
+    const completedRequired = requiredItems.filter(item => item.valid).length;
+    const totalRequired = requiredItems.length;
+    const completionPercentage = Math.round((completedRequired / totalRequired) * 100);
+    const allRequiredComplete = completedRequired === totalRequired;
     
     return (
         <div>
             <StepHeader title="Review & Finalize" subtitle="One last look before you're all set. Please confirm your details are correct." />
+            
+            {/* Data Completeness Checklist */}
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 p-6 bg-slate-800/50 rounded-xl border border-purple-500/30"
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white flex items-center">
+                        <CheckCircleIcon className="w-6 h-6 mr-2 text-cyan-400" />
+                        Data Completeness Check
+                    </h3>
+                    <div className="text-right">
+                        <div className="text-2xl font-bold text-cyan-400">{completionPercentage}%</div>
+                        <div className="text-xs text-slate-400">{completedRequired}/{totalRequired} required</div>
+                    </div>
+                </div>
+                
+                <div className="w-full bg-slate-700 rounded-full h-3 mb-6">
+                    <motion.div
+                        className={`h-3 rounded-full ${allRequiredComplete ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-purple-600 to-cyan-500'}`}
+                        initial={{ width: '0%' }}
+                        animate={{ width: `${completionPercentage}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                    />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {dataChecklist.map((item, index) => (
+                        <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className={`flex items-center justify-between p-3 rounded-lg ${
+                                item.valid 
+                                    ? 'bg-green-500/10 border border-green-500/30' 
+                                    : item.optional 
+                                    ? 'bg-slate-700/30 border border-slate-600' 
+                                    : 'bg-rose-500/10 border border-rose-500/30'
+                            }`}
+                        >
+                            <div className="flex items-center space-x-3 flex-1">
+                                {item.valid ? (
+                                    <CheckCircleIcon className="w-5 h-5 text-green-400 flex-shrink-0" />
+                                ) : item.optional ? (
+                                    <InfoIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                                ) : (
+                                    <XCircleIcon className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2">
+                                        <span className={`text-sm font-semibold ${item.valid ? 'text-white' : 'text-slate-300'}`}>
+                                            {item.label}
+                                        </span>
+                                        {item.optional && (
+                                            <span className="text-xs px-1.5 py-0.5 bg-slate-600 text-slate-300 rounded">Optional</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-400 truncate">{item.value}</p>
+                                </div>
+                            </div>
+                            {!item.valid && !item.optional && (
+                                <button
+                                    onClick={() => onEditStep(item.step)}
+                                    className="ml-2 px-3 py-1 text-xs bg-cyan-500/20 text-cyan-300 rounded hover:bg-cyan-500/30 transition-colors flex-shrink-0"
+                                >
+                                    Fix
+                                </button>
+                            )}
+                        </motion.div>
+                    ))}
+                </div>
+                
+                {!allRequiredComplete && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+                    >
+                        <p className="text-amber-300 text-sm flex items-center">
+                            <XCircleIcon className="w-5 h-5 mr-2" />
+                            Please complete all required fields before submitting. Click "Fix" buttons to edit specific steps.
+                        </p>
+                    </motion.div>
+                )}
+                
+                {allRequiredComplete && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg"
+                    >
+                        <p className="text-green-300 text-sm flex items-center">
+                            <CheckCircleIcon className="w-5 h-5 mr-2" />
+                            All required data is complete! You're ready to register.
+                        </p>
+                    </motion.div>
+                )}
+            </motion.div>
             
             <div className="space-y-4 mb-8">
                 <ReviewSection title="Team Identity" onEdit={() => onEditStep(0)}>
@@ -1036,6 +1213,7 @@ const RegistrationFlow: React.FC<RegistrationProps> = ({ onRegistrationComplete 
         if (!track) newErrors.track = 'Please select a track.';
         if (!collegeName.trim()) newErrors.collegeName = 'College name is required.';
         if (!city.trim()) newErrors.city = 'City is required.';
+        if (!institutionIdUrl) newErrors.institutionIdUrl = 'Institution ID proof is required.';
     }
     if (currentStep === 2) {
       let isStepValid = true;
@@ -1062,13 +1240,19 @@ const RegistrationFlow: React.FC<RegistrationProps> = ({ onRegistrationComplete 
       if (!projectSynopsis.trim() || projectSynopsis.trim().length < 20) newErrors.projectSynopsis = 'Please provide a synopsis of at least 20 characters.';
     }
     
+    setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleNextStep = () => {
     const fieldsToTouch: Record<string, boolean> = {};
     if(step === 0) fieldsToTouch.teamName = true;
-    if(step === 1) { fieldsToTouch.track = true; fieldsToTouch.collegeName = true; fieldsToTouch.city = true; }
+    if(step === 1) { 
+      fieldsToTouch.track = true; 
+      fieldsToTouch.collegeName = true; 
+      fieldsToTouch.city = true; 
+      fieldsToTouch.institutionIdUrl = true;
+    }
     if(step === 2) {
         Object.keys(leader).forEach(key => fieldsToTouch[`leader.${key}`] = true);
         members.forEach((m, i) => {
@@ -1084,6 +1268,11 @@ const RegistrationFlow: React.FC<RegistrationProps> = ({ onRegistrationComplete 
     if (validateStepOnNext(step)) {
       if (step === 0 && !teamId) setTeamId(`T${Date.now()}`);
       if (step < 4) setStep(s => s + 1);
+    } else {
+      // Show specific error message for institution ID if that's the issue
+      if (step === 1 && !institutionIdUrl) {
+        addToast("Please upload your institution ID proof to continue.", "error");
+      }
     }
   };
   const handlePrevStep = () => setStep(s => s - 1);
@@ -1110,32 +1299,115 @@ const RegistrationFlow: React.FC<RegistrationProps> = ({ onRegistrationComplete 
       setGeneratedIdeas(ideas); setIsGenerating(false);
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateStepOnNext(0) && validateStepOnNext(1) && validateStepOnNext(2) && validateStepOnNext(3)) {
+    
+    console.log("🚀 REGISTRATION SUBMISSION STARTED");
+    console.log("📋 Step 0 - Team Identity:");
+    console.log("  - Team Name:", teamName);
+    console.log("  - Team Logo URL:", teamLogoUrl);
+    console.log("  - Team ID:", teamId);
+    
+    console.log("📋 Step 1 - Team Info:");
+    console.log("  - Track:", track);
+    console.log("  - College Name:", collegeName);
+    console.log("  - City:", city);
+    console.log("  - Address:", address);
+    console.log("  - Institution ID URL:", institutionIdUrl);
+    
+    console.log("📋 Step 2 - Members:");
+    console.log("  - Leader:", leader);
+    console.log("  - Members:", members);
+    
+    console.log("📋 Step 3 - Project:");
+    console.log("  - GitHub Username:", githubUsername);
+    console.log("  - Project Synopsis:", projectSynopsis);
+    
+    console.log("📋 Step 4 - Final:");
+    console.log("  - Accommodation:", accommodation);
+    console.log("  - Payment Confirmed:", paymentConfirmed);
+    
+    // Validate all steps
+    console.log("🔍 Validating Step 0...");
+    const step0Valid = validateStepOnNext(0);
+    console.log("  Step 0 Valid:", step0Valid);
+    
+    console.log("🔍 Validating Step 1...");
+    const step1Valid = validateStepOnNext(1);
+    console.log("  Step 1 Valid:", step1Valid);
+    
+    console.log("🔍 Validating Step 2...");
+    const step2Valid = validateStepOnNext(2);
+    console.log("  Step 2 Valid:", step2Valid);
+    
+    console.log("🔍 Validating Step 3...");
+    const step3Valid = validateStepOnNext(3);
+    console.log("  Step 3 Valid:", step3Valid);
+    
+    if (step0Valid && step1Valid && step2Valid && step3Valid) {
+      console.log("✅ All steps validated successfully!");
+      
       if (!paymentConfirmed) {
+        console.log("❌ Payment not confirmed");
         addToast("Please confirm the payment to proceed.", "info");
         return;
       }
       
-      const newPassword = `${teamName.substring(0, 3).replace(/\s/g, '')}${Math.random().toString(36).slice(-5)}`.toUpperCase();
-      const submissionTicket = `SUBMIT-${teamId}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      
-      const newTeam: Team = {
-        id: teamId, name: teamName, leader, members: members.filter(m => m.name.trim() && m.email.trim()),
-        githubRepo: `https://github.com/${githubUsername}/${teamName.toLowerCase().replace(/\s/g, '-')}`,
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${teamId}_${teamName.replace(/\s/g, '')}`,
-        registeredAt: new Date().toISOString(),
-        track, collegeName, city, address, institutionIdUrl,
-        projectSynopsis, accommodation, password: newPassword, paymentStatus: 'Paid',
-        teamLogoUrl,
-        status: 'Registered',
-        isVerified: false,
-        submissionTicket,
-      };
-      
-      onRegistrationComplete(newTeam);
+      try {
+        console.log("🔧 Creating team object...");
+        addToast("Creating team registration...", "info");
+        
+        const newPassword = `${teamName.substring(0, 3).replace(/\s/g, '')}${Math.random().toString(36).slice(-5)}`.toUpperCase();
+        const submissionTicket = `SUBMIT-${teamId}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        
+        console.log("🔑 Generated Password:", newPassword);
+        console.log("🎫 Generated Ticket:", submissionTicket);
+        
+        const newTeam: Team = {
+          id: teamId, 
+          name: teamName, 
+          leader, 
+          members: members.filter(m => m.name.trim() && m.email.trim()),
+          githubRepo: `https://github.com/${githubUsername}/${teamName.toLowerCase().replace(/\s/g, '-')}`,
+          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${teamId}_${teamName.replace(/\s/g, '')}`,
+          registeredAt: new Date().toISOString(),
+          track, 
+          collegeName, 
+          city, 
+          address, 
+          institutionIdUrl,
+          projectSynopsis, 
+          accommodation, 
+          password: newPassword, 
+          paymentStatus: 'Paid',
+          teamLogoUrl,
+          status: 'Registered',
+          isVerified: false,
+          submissionTicket,
+        };
+        
+        console.log("📦 Complete Team Object:", newTeam);
+        
+        // Save to Firebase
+        console.log("💾 Saving to Firebase...");
+        await createTeam(newTeam);
+        console.log("✅ Team created successfully in Firebase");
+        addToast("Team registered successfully!", "success");
+        
+        console.log("🔄 Calling onRegistrationComplete callback...");
+        onRegistrationComplete(newTeam);
+        console.log("✅ onRegistrationComplete called - should redirect now");
+      } catch (error: any) {
+        console.error("❌ Registration error:", error);
+        console.error("❌ Error stack:", error.stack);
+        addToast(error.message || "Failed to register team. Please try again.", "error");
+      }
     } else {
+      console.log("❌ Validation failed!");
+      console.log("  Step 0:", step0Valid);
+      console.log("  Step 1:", step1Valid);
+      console.log("  Step 2:", step2Valid);
+      console.log("  Step 3:", step3Valid);
       addToast("Please fix the errors before submitting.", "error");
     }
   };

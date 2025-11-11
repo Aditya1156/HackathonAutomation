@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { mockTeams } from '../services/mockData';
+import { getAllTeams } from '../services/firebaseTeamService';
+import { Team } from '../types';
 import { UsersIcon, ClipboardCheckIcon, CheckCircleIcon, DownloadIcon, MegaphoneIcon, CertificateIcon } from '../components/IconComponents';
 import { useCountUp } from '../hooks/useCountUp';
 import { staggerContainer, fadeInUp } from '../animations/framerVariants';
@@ -37,16 +38,29 @@ const SkeletonStatCard = () => (
 
 const AdminDashboard: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
-    const totalParticipants = mockTeams.reduce((acc, team) => acc + team.members.length + 1, 0);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const totalParticipants = teams.reduce((acc, team) => acc + team.members.length + 1, 0);
+    const checkedInCount = teams.filter(team => team.status === 'Checked-in' || team.status === 'Verified').length;
+    const submissionsCount = teams.filter(team => team.submission).length;
     
     useEffect(() => {
-        const timer = setTimeout(() => setIsLoading(false), 1500); // Simulate data fetch
-        return () => clearTimeout(timer);
+        const fetchTeams = async () => {
+            try {
+                setIsLoading(true);
+                const fetchedTeams = await getAllTeams();
+                setTeams(fetchedTeams);
+            } catch (error) {
+                console.error('Error fetching teams:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchTeams();
     }, []);
 
     const handleDownloadCSV = () => {
         const headers = ["ID", "Team Name", "Leader Name", "Leader Email", "Members Count"];
-        const rows = mockTeams.map(team => [
+        const rows = teams.map(team => [
             team.id,
             `"${team.name.replace(/"/g, '""')}"`,
             team.leader.name,
@@ -71,7 +85,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     const handleGenerateCertificates = () => {
-        const teamCount = mockTeams.length;
+        const teamCount = teams.length;
         if (window.confirm(`Are you sure you want to generate ${teamCount} certificates? This is a mock action.`)) {
             setTimeout(() => {
                 alert(`Successfully generated mock PDF certificates for all ${teamCount} registered teams!`);
@@ -94,10 +108,10 @@ const AdminDashboard: React.FC = () => {
             </>
         ) : (
             <>
-                <StatCard icon={<UsersIcon className="w-6 h-6 text-white"/>} title="Total Teams" value={mockTeams.length} color="bg-purple-500/80" />
+                <StatCard icon={<UsersIcon className="w-6 h-6 text-white"/>} title="Total Teams" value={teams.length} color="bg-purple-500/80" />
                 <StatCard icon={<UsersIcon className="w-6 h-6 text-white"/>} title="Total Participants" value={totalParticipants} color="bg-emerald-500/80" />
-                <StatCard icon={<CheckCircleIcon className="w-6 h-6 text-white"/>} title="Check-ins (Mock)" value={15} color="bg-cyan-500/80" />
-                <StatCard icon={<ClipboardCheckIcon className="w-6 h-6 text-white"/>} title="Submissions (Mock)" value={8} color="bg-rose-500/80" />
+                <StatCard icon={<CheckCircleIcon className="w-6 h-6 text-white"/>} title="Check-ins" value={checkedInCount} color="bg-cyan-500/80" />
+                <StatCard icon={<ClipboardCheckIcon className="w-6 h-6 text-white"/>} title="Submissions" value={submissionsCount} color="bg-rose-500/80" />
             </>
         )}
       </div>

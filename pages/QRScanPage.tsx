@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import jsQR from 'jsqr';
 import { motion, AnimatePresence } from 'framer-motion';
-import { mockTeams } from '../services/mockData';
+import { getTeamById, updateTeamStatus } from '../services/firebaseTeamService';
 import type { Team } from '../types';
 import { QrcodeIcon, CheckCircleIcon, XCircleIcon } from '../components/IconComponents';
 
@@ -78,23 +78,43 @@ const QRScanPage: React.FC = () => {
     }, [isScanning]);
     
     useEffect(() => {
-        if (scanResult) {
-            // Format: T12345_CodeWizards
-            const teamId = scanResult.split('_')[0];
-            const foundTeam = mockTeams.find(team => team.id === teamId);
-            if (foundTeam) {
-                setTeamInfo(foundTeam);
-                setFeedbackMessage('Team Found!');
-            } else {
-                setTeamInfo(null);
-                setFeedbackMessage('Invalid QR Code: Team not found.');
+        const fetchTeamData = async () => {
+            if (scanResult) {
+                try {
+                    // Format: T12345_CodeWizards
+                    const teamId = scanResult.split('_')[0];
+                    const foundTeam = await getTeamById(teamId);
+                    if (foundTeam) {
+                        setTeamInfo(foundTeam);
+                        setFeedbackMessage('Team Found!');
+                    } else {
+                        setTeamInfo(null);
+                        setFeedbackMessage('Invalid QR Code: Team not found.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching team:', error);
+                    setTeamInfo(null);
+                    setFeedbackMessage('Error loading team data.');
+                }
             }
-        }
+        };
+        fetchTeamData();
     }, [scanResult]);
 
-    const handleMarkAttendance = () => {
-        setFeedbackMessage(`Attendance marked for ${teamInfo?.name}!`);
-        // In a real app, you would make an API call here.
+    const handleMarkAttendance = async () => {
+        if (!teamInfo) return;
+        
+        try {
+            setFeedbackMessage('Marking attendance...');
+            await updateTeamStatus(teamInfo.id, 'Checked-in');
+            setFeedbackMessage(`✅ Attendance marked for ${teamInfo.name}!`);
+            
+            // Update local state
+            setTeamInfo({ ...teamInfo, status: 'Checked-in' });
+        } catch (error) {
+            console.error('Error marking attendance:', error);
+            setFeedbackMessage('❌ Failed to mark attendance. Please try again.');
+        }
     };
 
     const handleStartScan = () => {

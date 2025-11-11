@@ -331,6 +331,22 @@
         -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
         mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
       }
+
+      /* Page Container - CRITICAL for content display */
+      .page-container {
+        min-height: calc(100vh - 80px); /* Account for header height */
+        width: 100%;
+        position: relative;
+        padding: 2rem 1rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      @media (min-width: 768px) {
+        .page-container {
+          padding: 3rem 2rem;
+        }
+      }
     </style>
   <script type="importmap">
 {
@@ -345,7 +361,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>

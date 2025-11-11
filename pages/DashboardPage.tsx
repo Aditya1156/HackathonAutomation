@@ -12,9 +12,10 @@ export type DashboardView = 'overview' | 'team' | 'project' | 'chat' | 'resource
 
 interface DashboardPageProps {
   team: Team;
+  onLogout: () => void;
 }
 
-const DashboardPage: React.FC<DashboardPageProps> = ({ team }) => {
+const DashboardPage: React.FC<DashboardPageProps> = ({ team, onLogout }) => {
   const [activeView, setActiveView] = useState<DashboardView>('overview');
   const addToast = useToast();
   const hasShownWelcomeRef = React.useRef(false);
@@ -51,7 +52,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ team }) => {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col md:flex-row gap-8">
-        <DashboardSidebar activeView={activeView} setActiveView={setActiveView} />
+        <DashboardSidebar activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
         <main className="flex-1 min-w-0">
           {renderContent()}
         </main>

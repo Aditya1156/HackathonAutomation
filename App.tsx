@@ -85,17 +85,17 @@ const AttractionModal: React.FC<{ attraction: Attraction; onClose: () => void }>
     );
 };
 
-// Function to initialize state from sessionStorage for session persistence
+// Function to initialize state from sessionStorage (tab session only)
 const getInitialState = () => {
     try {
-        if (typeof window === 'undefined' || !window.sessionStorage) {
+        if (typeof window === 'undefined') {
             return { initialMode: 'landing' as const, initialTeam: null };
         }
         
         const storedTeam = sessionStorage.getItem('activeTeam');
+        
         if (storedTeam) {
             const parsedTeam = JSON.parse(storedTeam) as Team;
-            // Validate the parsed team has required properties
             if (parsedTeam && parsedTeam.id && parsedTeam.name) {
                 return {
                     initialMode: 'student_dashboard' as const,
@@ -104,12 +104,12 @@ const getInitialState = () => {
             }
         }
     } catch (error) {
-        console.error("Failed to parse session storage:", error);
-        // Clear corrupted data
+        console.error("Failed to parse stored team:", error);
         try {
             sessionStorage.removeItem('activeTeam');
+            sessionStorage.removeItem('justRegistered');
         } catch (e) {
-            console.error("Failed to clear session storage:", e);
+            console.error("Failed to clear storage:", e);
         }
     }
     return { initialMode: 'landing' as const, initialTeam: null };
@@ -121,19 +121,28 @@ const App: React.FC = () => {
   const [appMode, setAppMode] = useState<'landing' | 'user' | 'admin' | 'student_login' | 'student_dashboard' | 'registration_success'>(initialMode);
   const [activeTeam, setActiveTeam] = useState<Team | null>(initialTeam);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   const isLoggingOut = React.useRef(false);
 
-  // Effect to handle logout navigation - ensures we navigate to landing when team is cleared
+  // Effect to handle logout navigation
   useEffect(() => {
-    // Skip if we're already in the process of logging out
     if (isLoggingOut.current) {
       isLoggingOut.current = false;
       return;
     }
     
-    // Auto-redirect to landing if team is cleared while in protected routes
     if (!activeTeam && (appMode === 'student_dashboard' || appMode === 'registration_success')) {
       setAppMode('landing');
+    }
+    
+    if (activeTeam && appMode !== 'student_dashboard' && appMode !== 'registration_success') {
+      try {
+        sessionStorage.removeItem('activeTeam');
+        sessionStorage.removeItem('justRegistered');
+      } catch (error) {
+        console.error("Failed to clear storage:", error);
+      }
+      setActiveTeam(null);
     }
   }, [activeTeam, appMode]);
 
@@ -160,7 +169,7 @@ const App: React.FC = () => {
     try {
       sessionStorage.setItem('activeTeam', JSON.stringify(team));
     } catch (error) {
-      console.error("Failed to save team to session storage:", error);
+      console.error("Failed to save team:", error);
     }
     setActiveTeam(team);
     setAppMode('registration_success');
@@ -184,48 +193,68 @@ const App: React.FC = () => {
     try {
       sessionStorage.setItem('activeTeam', JSON.stringify(team));
     } catch (error) {
-      console.error("Failed to save team to session storage:", error);
+      console.error("Failed to save team:", error);
     }
     setActiveTeam(team);
     setAppMode('student_dashboard');
   };
   
-  // Robust logout handler: clears storage and state, then navigates.
   const handleLogout = () => {
-    // Set flag to prevent useEffect interference
     isLoggingOut.current = true;
     
     try {
       sessionStorage.removeItem('activeTeam');
       sessionStorage.removeItem('justRegistered');
     } catch (error) {
-      console.error("Failed to clear session storage:", error);
+      console.error("Failed to clear storage:", error);
     }
     
-    // Clear team and navigate - both state updates in same render cycle
     setActiveTeam(null);
     setAppMode('landing');
   }
 
+  const handleSafeNavigation = (mode: 'landing' | 'user' | 'admin' | 'student_login' | 'student_dashboard' | 'registration_success') => {
+    if (isNavigating) return;
+    
+    setIsNavigating(true);
+    
+    if (activeTeam && (appMode === 'student_dashboard' || appMode === 'registration_success')) {
+      if (mode !== 'student_dashboard' && mode !== 'registration_success') {
+        handleLogout();
+        setTimeout(() => {
+          setAppMode(mode);
+          setIsNavigating(false);
+        }, 150);
+        return;
+      }
+    }
+    
+    setAppMode(mode);
+    setTimeout(() => setIsNavigating(false), 100);
+  }
+
   const renderContent = () => {
-    switch (appMode) {
-      case 'user':
-        return <UserPortal onRegistrationComplete={handleRegistrationComplete} />;
-      case 'registration_success':
-        // Protected route: If someone refreshes the success page without a session, send them to register.
-        if (!activeTeam) return <UserPortal onRegistrationComplete={handleRegistrationComplete} />;
-        return <RegistrationSuccessPage team={activeTeam} onProceed={handleNavigateToDashboard} />;
-      case 'admin':
-        return <AdminPortal />;
-      case 'student_login':
-        return <StudentLoginPage onLoginSuccess={handleLoginSuccess} />;
-      case 'student_dashboard':
-        // Protected route: Ensure team is logged in before rendering the dashboard.
-        if (!activeTeam) return <StudentLoginPage onLoginSuccess={handleLoginSuccess} />;
-        return <DashboardPage team={activeTeam} />;
-      case 'landing':
-      default:
-        return <LandingPage setAppMode={setAppMode} onAttractionClick={handleOpenAttractionModal} />;
+    try {
+      switch (appMode) {
+        case 'user':
+          return <UserPortal onRegistrationComplete={handleRegistrationComplete} />;
+        case 'registration_success':
+          if (!activeTeam) return <UserPortal onRegistrationComplete={handleRegistrationComplete} />;
+          return <RegistrationSuccessPage team={activeTeam} onProceed={handleNavigateToDashboard} />;
+        case 'admin':
+          return <AdminPortal />;
+        case 'student_login':
+          return <StudentLoginPage onLoginSuccess={handleLoginSuccess} />;
+        case 'student_dashboard':
+          if (!activeTeam) return <StudentLoginPage onLoginSuccess={handleLoginSuccess} />;
+          return <DashboardPage team={activeTeam} onLogout={handleLogout} />;
+        case 'landing':
+        default:
+          return <LandingPage setAppMode={handleSafeNavigation} onAttractionClick={handleOpenAttractionModal} />;
+      }
+    } catch (error) {
+      console.error("Error rendering content:", error);
+      return <LandingPage setAppMode={handleSafeNavigation} onAttractionClick={handleOpenAttractionModal} />;
     }
   };
 
@@ -234,7 +263,7 @@ const App: React.FC = () => {
       <ToastProvider>
         <div className="min-h-screen font-sans">
           <TargetCursor spinDuration={4} hideDefaultCursor={true} />
-          <Header setAppMode={setAppMode} onLogoClick={handleLogout} />
+          <Header setAppMode={handleSafeNavigation} onLogoClick={handleLogout} />
           <main className="page-container">
             <ScrollFXContainer>
               <AnimatePresence mode="wait">

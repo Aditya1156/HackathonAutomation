@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Team } from '../types';
-import { mockTeams } from '../services/mockData';
+import { getTeamById } from '../services/firebaseTeamService';
 import { staggerContainer, fadeInUp } from '../animations/framerVariants';
 import { GlowButton } from '../components/AnimatedComponents';
 import { XCircleIcon, CheckCircleIcon } from '../components/IconComponents';
@@ -45,7 +45,7 @@ const StudentLoginPage: React.FC<StudentLoginPageProps> = ({ onLoginSuccess }) =
         validateTeamId(teamId);
     };
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsIdTouched(true);
         const isIdValid = validateTeamId(teamId);
@@ -57,18 +57,28 @@ const StudentLoginPage: React.FC<StudentLoginPageProps> = ({ onLoginSuccess }) =
         setIsLoading(true);
         setError(null);
 
-        setTimeout(() => {
-            const foundTeam = mockTeams.find(
-                team => team.id.toLowerCase() === teamId.toLowerCase() && team.password === password
-            );
+        try {
+            // Fetch team from Firebase
+            const foundTeam = await getTeamById(teamId);
             
-            if (foundTeam) {
-                onLoginSuccess(foundTeam);
-            } else {
-                setError('Invalid Team ID or Password. Please check your credentials.');
+            if (!foundTeam) {
+                setError('Team ID not found. Please check your credentials.');
+                setIsLoading(false);
+                return;
             }
+            
+            if (foundTeam.password !== password) {
+                setError('Invalid password. Please check your credentials.');
+                setIsLoading(false);
+                return;
+            }
+            
+            onLoginSuccess(foundTeam);
+        } catch (error: any) {
+            console.error('Login error:', error);
+            setError(error.message || 'Failed to login. Please try again.');
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
     const isIdValid = isIdTouched && !teamIdError && teamId;

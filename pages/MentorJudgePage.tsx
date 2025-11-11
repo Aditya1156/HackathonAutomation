@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { mockTeams } from '../services/mockData';
+import { getAllTeams, updateTeam, deleteTeam } from '../services/firebaseTeamService';
 import type { Team } from '../types';
-import { EyeIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon, PencilIcon, XIcon, CheckBadgeIcon } from '../components/IconComponents';
+import { EyeIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon, PencilIcon, XIcon, CheckBadgeIcon, KeyIcon, ClipboardCopyIcon, ExclamationIcon } from '../components/IconComponents';
 import { staggerContainer, modalBackdropVariants, modalContentVariants } from '../animations/framerVariants';
 import { useToast } from '../hooks/useToast';
 import { GlowButton } from '../components/AnimatedComponents';
@@ -120,6 +120,125 @@ const EditTeamModal: React.FC<{ team: Team, onSave: (updatedTeam: Team) => void,
     );
 };
 
+const CredentialsModal: React.FC<{ team: Team, onClose: () => void }> = ({ team, onClose }) => {
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+    const addToast = useToast();
+
+    const handleCopy = (text: string, fieldName: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedField(fieldName);
+            addToast(`${fieldName} copied to clipboard!`, 'success');
+            setTimeout(() => setCopiedField(null), 2000);
+        }).catch(() => {
+            addToast('Failed to copy to clipboard', 'error');
+        });
+    };
+
+    return (
+        <motion.div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1000] p-4"
+            variants={modalBackdropVariants} initial="hidden" animate="visible" exit="hidden"
+            onClick={onClose}
+        >
+            <motion.div
+                variants={modalContentVariants}
+                className="relative bg-[#100D1C] w-full max-w-md p-8 rounded-xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center space-x-3 mb-6">
+                    <div className="bg-cyan-500/20 p-3 rounded-full">
+                        <KeyIcon className="w-8 h-8 text-cyan-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-white font-orbitron">Team Credentials</h2>
+                        <p className="text-slate-400 text-sm">{team.name}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Team ID */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-cyan-500/30">
+                        <label className="text-xs text-slate-400 uppercase font-semibold mb-2 block">Team ID</label>
+                        <div className="flex items-center justify-between">
+                            <code className="text-cyan-400 font-mono text-lg font-semibold">{team.id}</code>
+                            <button
+                                onClick={() => handleCopy(team.id, 'Team ID')}
+                                className="p-2 hover:bg-cyan-500/20 rounded-lg transition-colors group"
+                                title="Copy Team ID"
+                            >
+                                {copiedField === 'Team ID' ? (
+                                    <CheckBadgeIcon className="w-5 h-5 text-green-400" />
+                                ) : (
+                                    <ClipboardCopyIcon className="w-5 h-5 text-slate-400 group-hover:text-cyan-400" />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Password */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-purple-500/30">
+                        <label className="text-xs text-slate-400 uppercase font-semibold mb-2 block">Password</label>
+                        <div className="flex items-center justify-between">
+                            <code className="text-purple-400 font-mono text-lg font-semibold">{team.password}</code>
+                            <button
+                                onClick={() => handleCopy(team.password, 'Password')}
+                                className="p-2 hover:bg-purple-500/20 rounded-lg transition-colors group"
+                                title="Copy Password"
+                            >
+                                {copiedField === 'Password' ? (
+                                    <CheckBadgeIcon className="w-5 h-5 text-green-400" />
+                                ) : (
+                                    <ClipboardCopyIcon className="w-5 h-5 text-slate-400 group-hover:text-purple-400" />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Team Info */}
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-600/30">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p className="text-slate-500 text-xs uppercase font-semibold mb-1">Leader</p>
+                                <p className="text-white">{team.leader.name}</p>
+                            </div>
+                            <div>
+                                <p className="text-slate-500 text-xs uppercase font-semibold mb-1">Email</p>
+                                <p className="text-white truncate" title={team.leader.email}>{team.leader.email}</p>
+                            </div>
+                            <div>
+                                <p className="text-slate-500 text-xs uppercase font-semibold mb-1">Contact</p>
+                                <p className="text-white">{team.leader.contactNumber}</p>
+                            </div>
+                            <div>
+                                <p className="text-slate-500 text-xs uppercase font-semibold mb-1">Track</p>
+                                <p className="text-white truncate" title={team.track}>{team.track}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-6 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <p className="text-amber-400 text-xs flex items-start">
+                        <ExclamationIcon className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>Keep these credentials secure. Share only with the team leader if they forget their login details.</span>
+                    </p>
+                </div>
+
+                <button
+                    onClick={onClose}
+                    className="mt-6 w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                >
+                    Close
+                </button>
+
+                <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white">
+                    <XIcon className="w-6 h-6"/>
+                </button>
+            </motion.div>
+        </motion.div>
+    );
+};
+
 const StatusUpdater: React.FC<{ team: Team, onStatusChange: (teamId: string, status: Team['status']) => void }> = ({ team, onStatusChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -181,30 +300,57 @@ const TeamsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'registeredAt', direction: 'dsc' });
     const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+    const [viewingCredentials, setViewingCredentials] = useState<Team | null>(null);
     const addToast = useToast();
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setTeams(mockTeams);
-            setIsLoading(false)
-        }, 1200);
-        return () => clearTimeout(timer);
+        const fetchTeams = async () => {
+            try {
+                setIsLoading(true);
+                const fetchedTeams = await getAllTeams();
+                setTeams(fetchedTeams);
+            } catch (error) {
+                console.error('Error fetching teams:', error);
+                addToast('Failed to load teams', 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchTeams();
     }, []);
     
-    const handleStatusChange = (teamId: string, status: Team['status']) => {
-        setTeams(prevTeams => prevTeams.map(t => t.id === teamId ? { ...t, status } : t));
-        addToast(`Status updated to "${status}"`, 'info');
+    const handleStatusChange = async (teamId: string, status: Team['status']) => {
+        try {
+            await updateTeam(teamId, { status });
+            setTeams(prevTeams => prevTeams.map(t => t.id === teamId ? { ...t, status } : t));
+            addToast(`Status updated to "${status}"`, 'info');
+        } catch (error) {
+            console.error('Error updating status:', error);
+            addToast('Failed to update status', 'error');
+        }
     };
     
-    const handleVerificationChange = (teamId: string, isVerified: boolean) => {
-        setTeams(prevTeams => prevTeams.map(t => t.id === teamId ? { ...t, isVerified } : t));
-        addToast(`Verification status changed`, 'info');
+    const handleVerificationChange = async (teamId: string, isVerified: boolean) => {
+        try {
+            await updateTeam(teamId, { isVerified });
+            setTeams(prevTeams => prevTeams.map(t => t.id === teamId ? { ...t, isVerified } : t));
+            addToast(`Verification status changed`, 'info');
+        } catch (error) {
+            console.error('Error updating verification:', error);
+            addToast('Failed to update verification', 'error');
+        }
     };
     
-    const handleSaveEdit = (updatedTeam: Team) => {
-        setTeams(prevTeams => prevTeams.map(t => t.id === updatedTeam.id ? updatedTeam : t));
-        setEditingTeam(null);
-        addToast(`Team "${updatedTeam.name}" updated successfully!`, 'success');
+    const handleSaveEdit = async (updatedTeam: Team) => {
+        try {
+            await updateTeam(updatedTeam.id, updatedTeam);
+            setTeams(prevTeams => prevTeams.map(t => t.id === updatedTeam.id ? updatedTeam : t));
+            setEditingTeam(null);
+            addToast(`Team "${updatedTeam.name}" updated successfully!`, 'success');
+        } catch (error) {
+            console.error('Error updating team:', error);
+            addToast('Failed to update team', 'error');
+        }
     };
 
     const requestSort = (key: SortKey) => {
@@ -264,6 +410,7 @@ const TeamsPage: React.FC = () => {
     <>
       <AnimatePresence>
         {editingTeam && <EditTeamModal team={editingTeam} onSave={handleSaveEdit} onCancel={() => setEditingTeam(null)} />}
+        {viewingCredentials && <CredentialsModal team={viewingCredentials} onClose={() => setViewingCredentials(null)} />}
       </AnimatePresence>
 
       <h1 className="text-4xl font-bold mb-4">Registered Teams</h1>
@@ -333,7 +480,15 @@ const TeamsPage: React.FC = () => {
                             </td>
                             <td className="p-4 text-right">
                                 <div className="flex justify-end space-x-1">
-                                    <button onClick={() => setEditingTeam(team)} className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-cyan-400 transition-colors" aria-label="Edit Team"><PencilIcon className="w-5 h-5"/></button>
+                                    <button 
+                                        onClick={() => setViewingCredentials(team)} 
+                                        className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-cyan-400 transition-colors" 
+                                        aria-label="View Credentials"
+                                        title="View Team Credentials"
+                                    >
+                                        <KeyIcon className="w-5 h-5"/>
+                                    </button>
+                                    <button onClick={() => setEditingTeam(team)} className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-purple-400 transition-colors" aria-label="Edit Team"><PencilIcon className="w-5 h-5"/></button>
                                     <button className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-rose-400 transition-colors" aria-label="Delete Team"><TrashIcon className="w-5 h-5"/></button>
                                 </div>
                             </td>

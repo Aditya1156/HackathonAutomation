@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Team } from '../types';
 import { sendEmailNotification, sendWhatsAppNotification, sendSmsNotification } from '../services/notificationService';
-import { CheckCircleIcon, XCircleIcon, CopyIcon, UserCircleIcon, TrophyIcon, FileTextIcon } from '../components/IconComponents';
+import { CheckCircleIcon, XCircleIcon, CopyIcon, UserCircleIcon, TrophyIcon, FileTextIcon, StarIcon, MapPinIcon, CubeIcon } from '../components/IconComponents';
 import { fadeInUp, staggerContainer } from '../animations/framerVariants';
 import { GlowButton } from '../components/AnimatedComponents';
 import { useToast } from '../hooks/useToast';
@@ -82,6 +82,7 @@ const RegistrationSuccessPage: React.FC<RegistrationSuccessPageProps> = ({ team,
     const [emailError, setEmailError] = useState<string | null>(null);
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const [smsError, setSmsError] = useState<string | null>(null);
+    const [showInviteCard, setShowInviteCard] = useState(true);
     const password = team.password!;
     const addToast = useToast();
     const allMembers = [team.leader, ...team.members];
@@ -159,121 +160,285 @@ const RegistrationSuccessPage: React.FC<RegistrationSuccessPageProps> = ({ team,
 
     return (
          <motion.div
-            className="min-h-screen flex items-center justify-center p-4"
+            className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
             variants={staggerContainer}
             initial="hidden"
             animate="visible"
         >
             <Confetti />
+            
+            {/* Main Success Card */}
             <motion.div
-                className="w-full max-w-4xl bg-slate-900/50 rounded-2xl border-2 border-purple-500/30 backdrop-blur-lg shadow-2xl shadow-purple-900/20 text-center p-8 md:p-12 glowing-card"
+                className="w-full max-w-6xl relative z-10"
                 variants={fadeInUp}
             >
-                 <div className="glowing-card-content !bg-transparent !p-0">
-                    <motion.div variants={fadeInUp} className="text-yellow-400 mb-4">
-                        <TrophyIcon className="w-16 h-16 mx-auto"/>
-                    </motion.div>
-                    <motion.h2
-                        variants={fadeInUp}
-                        className="text-4xl sm:text-5xl font-bold font-orbitron text-white"
-                    >
-                        Congratulations!
-                    </motion.h2>
-
-                    <motion.p variants={fadeInUp} className="text-slate-300 mt-3 text-lg">
-                        Welcome, <span className="font-bold text-cyan-400">{team.name}</span>. You're officially registered!
-                    </motion.p>
-
-                    <motion.div variants={fadeInUp} className="w-24 h-1 bg-cyan-400 mx-auto mt-6 mb-8 rounded-full" />
-                    
-                    <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="text-left">
-                        <motion.h3 variants={fadeInUp} className="font-bold text-xl text-cyan-400 mb-4">Your Crew</motion.h3>
-                        <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-                            {allMembers.map((member, index) => (
-                                <motion.div
-                                    key={member.email}
-                                    variants={memberCardVariants}
-                                    transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.2 + index * 0.1 }}
-                                    className="flex flex-col items-center"
+                {/* Invitation Card */}
+                <AnimatePresence>
+                    {showInviteCard && (
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, rotateY: -10 }}
+                            animate={{ scale: 1, opacity: 1, rotateY: 0 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            transition={{ type: 'spring', duration: 0.8 }}
+                            className="bg-gradient-to-br from-purple-900/40 via-slate-900/90 to-cyan-900/40 rounded-3xl border-2 border-purple-500/50 backdrop-blur-xl shadow-2xl shadow-purple-900/50 overflow-hidden mb-6"
+                        >
+                            {/* Decorative Top Pattern */}
+                            <div className="h-2 bg-gradient-to-r from-purple-500 via-cyan-400 to-purple-500"></div>
+                            
+                            <div className="p-8 md:p-12">
+                                {/* Trophy & Success Message */}
+                                <motion.div 
+                                    className="text-center mb-8"
+                                    initial={{ y: -20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ delay: 0.3 }}
                                 >
-                                    <div className="relative">
-                                        {member.profilePictureUrl ? (
-                                            <img src={member.profilePictureUrl} alt={member.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-4 border-slate-700 shadow-lg"/>
-                                        ) : (
-                                            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-700 flex items-center justify-center border-4 border-slate-600">
-                                                <UserCircleIcon className="w-12 h-12 text-slate-500" />
-                                            </div>
-                                        )}
-                                        {index === 0 && (
-                                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 text-xs font-bold text-cyan-300 bg-cyan-900/80 border border-cyan-500/50 rounded-full">LEADER</div>
-                                        )}
-                                    </div>
-                                    <p className="mt-3 font-semibold text-white text-sm md:text-base">{member.name}</p>
+                                    <motion.div
+                                        animate={{ 
+                                            rotate: [0, -10, 10, -10, 0],
+                                            scale: [1, 1.1, 1]
+                                        }}
+                                        transition={{ duration: 1, delay: 0.5 }}
+                                        className="inline-block"
+                                    >
+                                        <TrophyIcon className="w-20 h-20 text-yellow-400 mx-auto drop-shadow-lg"/>
+                                    </motion.div>
+                                    
+                                    <motion.h1
+                                        className="text-5xl md:text-6xl font-bold font-orbitron text-white mt-4 mb-3"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.4, type: 'spring' }}
+                                    >
+                                        🎉 Congratulations! 🎉
+                                    </motion.h1>
+                                    
+                                    <motion.p 
+                                        className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.6 }}
+                                    >
+                                        {team.name}
+                                    </motion.p>
+                                    
+                                    <motion.p
+                                        className="text-slate-300 mt-2 text-lg"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.7 }}
+                                    >
+                                        You're officially registered for the hackathon!
+                                    </motion.p>
                                 </motion.div>
-                            ))}
-                        </div>
-                    </motion.div>
-                    
-                    <motion.div variants={fadeInUp} className="mt-8 space-y-4 text-left text-sm">
-                        <div className="bg-slate-800/50 p-4 rounded-lg">
-                            <label className="text-slate-400 font-semibold">Team ID</label>
-                            <div className="flex items-center mt-1">
-                                <span className="font-mono bg-slate-700 px-2 py-1 rounded text-white flex-grow">{team.id}</span>
-                                <button onClick={() => handleCopy(team.id, 'ID')} className="p-1.5 ml-2 text-slate-400 hover:text-white transition-colors">
-                                    {isCopiedId ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4"/>}
-                                </button>
-                            </div>
-                        </div>
-                         <div className="bg-slate-800/50 p-4 rounded-lg">
-                            <label className="text-slate-400 font-semibold">Password</label>
-                             <div className="flex items-center mt-1">
-                                <span className="font-mono bg-slate-700 px-2 py-1 rounded text-white flex-grow">{password}</span>
-                                <button onClick={() => handleCopy(password, 'Password')} className="p-1.5 ml-2 text-slate-400 hover:text-white transition-colors">
-                                    {isCopiedPassword ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4"/>}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="bg-slate-800/50 p-4 rounded-lg">
-                            <label className="text-slate-400 font-semibold flex items-center">
-                                <FileTextIcon className="w-4 h-4 mr-2" />
-                                File Submission Ticket
-                            </label>
-                             <div className="flex items-center mt-1">
-                                <span className="font-mono bg-slate-700 px-2 py-1 rounded text-white flex-grow">{team.submissionTicket}</span>
-                                <button onClick={() => handleCopy(team.submissionTicket!, 'Ticket')} className="p-1.5 ml-2 text-slate-400 hover:text-white transition-colors">
-                                    {isCopiedTicket ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4"/>}
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                    
-                     <motion.div variants={fadeInUp} className="mt-4 flex flex-col items-center justify-center gap-y-2">
-                         <NotificationStatusItem 
-                            status={emailStatus} 
-                            serviceName="Confirmation Email"
-                            onRetry={handleSendEmail}
-                            errorDetails={emailError}
-                        />
-                         <NotificationStatusItem 
-                            status={whatsappStatus} 
-                            serviceName="WhatsApp Message"
-                            onRetry={handleSendWhatsapp}
-                            errorDetails={whatsappError}
-                        />
-                         <NotificationStatusItem 
-                            status={smsStatus} 
-                            serviceName="SMS Notification"
-                            onRetry={handleSendSms}
-                            errorDetails={smsError}
-                        />
-                     </motion.div>
 
-                    <motion.div variants={fadeInUp} className="mt-10">
-                        <GlowButton onClick={onProceed} className="px-10 py-4 text-xl">
-                            Proceed to Dashboard
-                        </GlowButton>
-                    </motion.div>
-                </div>
+                                {/* Decorative Divider */}
+                                <motion.div 
+                                    className="w-32 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent mx-auto mb-8"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: 128 }}
+                                    transition={{ delay: 0.8, duration: 0.6 }}
+                                />
+
+                                {/* Team Details Grid */}
+                                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                                    {/* Left Column - Team Info */}
+                                    <motion.div
+                                        initial={{ x: -50, opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
+                                        transition={{ delay: 0.9 }}
+                                        className="space-y-4"
+                                    >
+                                        <div className="bg-slate-800/60 rounded-xl p-6 border border-purple-500/30">
+                                            <h3 className="text-cyan-400 font-bold text-lg mb-4 flex items-center">
+                                                <CubeIcon className="w-5 h-5 mr-2" />
+                                                Team Information
+                                            </h3>
+                                            <div className="space-y-3 text-sm">
+                                                <div>
+                                                    <span className="text-slate-400">Track:</span>
+                                                    <p className="text-white font-semibold">{team.track}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400">College:</span>
+                                                    <p className="text-white font-semibold">{team.collegeName}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 flex items-center">
+                                                        <MapPinIcon className="w-4 h-4 mr-1" />
+                                                        Location:
+                                                    </span>
+                                                    <p className="text-white font-semibold">{team.city}</p>
+                                                </div>
+                                                {team.accommodation && (
+                                                    <div className="mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg">
+                                                        <p className="text-amber-300 text-xs font-semibold">🏠 Accommodation Required</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Credentials */}
+                                        <div className="bg-slate-800/60 rounded-xl p-6 border border-green-500/30 space-y-3">
+                                            <h3 className="text-green-400 font-bold text-lg mb-4">🔐 Your Credentials</h3>
+                                            
+                                            <div>
+                                                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Team ID</label>
+                                                <div className="flex items-center mt-1 bg-slate-900 rounded-lg p-2">
+                                                    <span className="font-mono text-white font-bold flex-grow">{team.id}</span>
+                                                    <button onClick={() => handleCopy(team.id, 'ID')} className="ml-2 p-1.5 hover:bg-slate-700 rounded transition-colors">
+                                                        {isCopiedId ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4 text-slate-400"/>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Password</label>
+                                                <div className="flex items-center mt-1 bg-slate-900 rounded-lg p-2">
+                                                    <span className="font-mono text-white font-bold flex-grow">{password}</span>
+                                                    <button onClick={() => handleCopy(password, 'Password')} className="ml-2 p-1.5 hover:bg-slate-700 rounded transition-colors">
+                                                        {isCopiedPassword ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4 text-slate-400"/>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wide flex items-center">
+                                                    <FileTextIcon className="w-3 h-3 mr-1" />
+                                                    Submission Ticket
+                                                </label>
+                                                <div className="flex items-center mt-1 bg-slate-900 rounded-lg p-2">
+                                                    <span className="font-mono text-white text-xs flex-grow">{team.submissionTicket}</span>
+                                                    <button onClick={() => handleCopy(team.submissionTicket!, 'Ticket')} className="ml-2 p-1.5 hover:bg-slate-700 rounded transition-colors">
+                                                        {isCopiedTicket ? <CheckCircleIcon className="w-4 h-4 text-green-400"/> : <CopyIcon className="w-4 h-4 text-slate-400"/>}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                                <p className="text-amber-300 text-xs">⚠️ Save these credentials! You'll need them to access your dashboard.</p>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Right Column - Team Members */}
+                                    <motion.div
+                                        initial={{ x: 50, opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
+                                        transition={{ delay: 1 }}
+                                        className="bg-slate-800/60 rounded-xl p-6 border border-cyan-500/30"
+                                    >
+                                        <h3 className="text-cyan-400 font-bold text-lg mb-6 flex items-center">
+                                            <StarIcon className="w-5 h-5 mr-2" />
+                                            Your Amazing Team
+                                        </h3>
+                                        
+                                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                                            {allMembers.map((member, index) => (
+                                                <motion.div
+                                                    key={member.email}
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: 1.1 + index * 0.1 }}
+                                                    className="bg-slate-900/50 rounded-lg p-4 border border-slate-700 hover:border-cyan-500/50 transition-all"
+                                                >
+                                                    <div className="flex items-start space-x-4">
+                                                        <div className="relative flex-shrink-0">
+                                                            {member.profilePictureUrl ? (
+                                                                <img 
+                                                                    src={member.profilePictureUrl} 
+                                                                    alt={member.name} 
+                                                                    className="w-16 h-16 rounded-full object-cover border-2 border-cyan-500/50 shadow-lg"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center border-2 border-cyan-500/50">
+                                                                    <UserCircleIcon className="w-10 h-10 text-white" />
+                                                                </div>
+                                                            )}
+                                                            {index === 0 && (
+                                                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-slate-900">
+                                                                    <span className="text-xs">👑</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <h4 className="font-bold text-white truncate">{member.name}</h4>
+                                                                {index === 0 && (
+                                                                    <span className="text-xs px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded-full font-semibold">Leader</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-slate-400 text-sm truncate">{member.email}</p>
+                                                            <p className="text-slate-500 text-xs mt-1">{member.contactNumber}</p>
+                                                            {member.skills && member.skills.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {member.skills.map((skill, idx) => (
+                                                                        <span key={idx} className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded">
+                                                                            {skill}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                </div>
+
+                                {/* Notification Status */}
+                                <motion.div 
+                                    className="bg-slate-800/40 rounded-xl p-6 border border-purple-500/20 mb-6"
+                                    initial={{ y: 20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ delay: 1.2 }}
+                                >
+                                    <h3 className="text-slate-300 font-semibold text-center mb-4">📨 Notification Status</h3>
+                                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                                        <NotificationStatusItem 
+                                            status={emailStatus} 
+                                            serviceName="Email"
+                                            onRetry={handleSendEmail}
+                                            errorDetails={emailError}
+                                        />
+                                        <NotificationStatusItem 
+                                            status={whatsappStatus} 
+                                            serviceName="WhatsApp"
+                                            onRetry={handleSendWhatsapp}
+                                            errorDetails={whatsappError}
+                                        />
+                                        <NotificationStatusItem 
+                                            status={smsStatus} 
+                                            serviceName="SMS"
+                                            onRetry={handleSendSms}
+                                            errorDetails={smsError}
+                                        />
+                                    </div>
+                                </motion.div>
+
+                                {/* Action Button */}
+                                <motion.div 
+                                    className="text-center"
+                                    initial={{ y: 20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ delay: 1.3 }}
+                                >
+                                    <GlowButton onClick={onProceed} className="px-12 py-4 text-xl">
+                                        🚀 Proceed to Dashboard
+                                    </GlowButton>
+                                    <p className="text-slate-400 text-sm mt-4">
+                                        Ready to start building something amazing? Let's go!
+                                    </p>
+                                </motion.div>
+                            </div>
+                            
+                            {/* Decorative Bottom Pattern */}
+                            <div className="h-2 bg-gradient-to-r from-purple-500 via-cyan-400 to-purple-500"></div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         </motion.div>
     );

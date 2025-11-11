@@ -1,40 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { Judge, Team, JudgeEvaluation, JudgingRound, JudgingCriteria } from '../types';
+import { getAllTeams } from '../services/firebaseTeamService';
+import { submitEvaluation, getLeaderboard } from '../services/firebaseJudgingService';
+import { hasJudgeEvaluatedTeam } from '../services/firebaseJuryAuthService';
 import { StarIcon, TrophyIcon, UserCircleIcon, CheckCircleIcon, ClipboardCheckIcon } from '../components/IconComponents';
 import { useToast } from '../hooks/useToast';
 import { fadeInUp, staggerContainer } from '../animations/framerVariants';
-
-// Mock data - In production, this would come from backend
-const mockJudges: Judge[] = [
-  {
-    id: 'j1',
-    name: 'Dr. Rajesh Kumar',
-    email: 'rajesh@example.com',
-    designation: 'Senior Technical Architect',
-    organization: 'Tech Corp',
-    expertise: ['AI/ML', 'Cloud Computing', 'System Design'],
-    assignedRounds: ['Round 1', 'Round 2', 'Final'],
-  },
-  {
-    id: 'j2',
-    name: 'Ms. Priya Sharma',
-    email: 'priya@example.com',
-    designation: 'Product Manager',
-    organization: 'Innovation Labs',
-    expertise: ['UI/UX', 'Product Design', 'Agile'],
-    assignedRounds: ['Round 1', 'Round 2'],
-  },
-  {
-    id: 'j3',
-    name: 'Mr. Arjun Mehta',
-    email: 'arjun@example.com',
-    designation: 'Chief Technology Officer',
-    organization: 'StartupHub',
-    expertise: ['Blockchain', 'FinTech', 'Scalability'],
-    assignedRounds: ['Round 2', 'Final'],
-  },
-];
+import JuryLogin from '../components/JuryLogin';
 
 const criteriaLabels = {
   progress: 'Progress',
@@ -44,12 +17,11 @@ const criteriaLabels = {
   implementation: 'Technical Implementation',
 };
 
-interface JuryPortalProps {
-  teams: Team[];
-  currentJudge?: Judge; // Logged in judge
-}
-
-const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
+const JuryPortal: React.FC = () => {
+  const [authenticatedJudge, setAuthenticatedJudge] = useState<Judge | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [selectedRound, setSelectedRound] = useState<JudgingRound>('Round 1');
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [evaluations, setEvaluations] = useState<JudgeEvaluation[]>([]);
@@ -64,8 +36,71 @@ const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
   const [viewMode, setViewMode] = useState<'evaluate' | 'leaderboard'>('evaluate');
   const addToast = useToast();
 
-  // Use mock judge if no current judge provided
-  const judge = currentJudge || mockJudges[0];
+  // Check for existing jury session
+  useEffect(() => {
+    const storedAuth = localStorage.getItem('juryAuth');
+    if (storedAuth) {
+      try {
+        const judge = JSON.parse(storedAuth);
+        setAuthenticatedJudge(judge);
+      } catch (e) {
+        localStorage.removeItem('juryAuth');
+      }
+    }
+    setIsCheckingAuth(false);
+  }, []);
+
+  // Load teams on mount
+  useEffect(() => {
+    if (!authenticatedJudge) return;
+
+    const fetchTeams = async () => {
+      try {
+        setIsLoadingTeams(true);
+        const fetchedTeams = await getAllTeams();
+        setTeams(fetchedTeams);
+      } catch (error) {
+        console.error('Error fetching teams:', error);
+        addToast('Failed to load teams', 'error');
+      } finally {
+        setIsLoadingTeams(false);
+      }
+    };
+    fetchTeams();
+  }, [authenticatedJudge]);
+
+  const handleLoginSuccess = (judge: Judge) => {
+    setAuthenticatedJudge(judge);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('juryAuth');
+    setAuthenticatedJudge(null);
+    setSelectedTeam(null);
+    setCurrentCriteria({
+      progress: 0,
+      ui: 0,
+      presentation: 0,
+      idea: 0,
+      implementation: 0,
+    });
+    setComments('');
+  };
+
+  // Show login screen if not authenticated
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!authenticatedJudge) {
+    return <JuryLogin onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const judge = authenticatedJudge;
 
   const handleCriteriaChange = (criterion: keyof JudgingCriteria, value: number) => {
     setCurrentCriteria(prev => ({
@@ -78,7 +113,7 @@ const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
     return Object.values(criteria).reduce((sum, val) => sum + val, 0);
   };
 
-  const handleSubmitEvaluation = () => {
+  const handleSubmitEvaluation = async () => {
     if (!selectedTeam) {
       addToast('Please select a team first!', 'error');
       return;
@@ -90,30 +125,45 @@ const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
       return;
     }
 
-    const newEvaluation: JudgeEvaluation = {
-      judgeId: judge.id,
-      judgeName: judge.name,
-      round: selectedRound,
-      teamId: selectedTeam.id,
-      criteria: { ...currentCriteria },
-      comments,
-      totalScore: total,
-      evaluatedAt: new Date().toISOString(),
-    };
+    try {
+      // Check if already evaluated
+      const alreadyEvaluated = await hasJudgeEvaluatedTeam(judge.juryId, selectedTeam.id, selectedRound);
+      if (alreadyEvaluated) {
+        addToast('You have already evaluated this team in this round!', 'error');
+        return;
+      }
 
-    setEvaluations(prev => [...prev, newEvaluation]);
-    addToast(`Evaluation submitted for Team ${selectedTeam.name}!`, 'success');
-    
-    // Reset form
-    setCurrentCriteria({
-      progress: 0,
-      ui: 0,
-      presentation: 0,
-      idea: 0,
-      implementation: 0,
-    });
-    setComments('');
-    setSelectedTeam(null);
+      const newEvaluation: JudgeEvaluation = {
+        judgeId: judge.juryId, // Use juryId (J001, J002)
+        judgeName: judge.name,
+        round: selectedRound,
+        teamId: selectedTeam.id,
+        criteria: { ...currentCriteria },
+        comments,
+        totalScore: total,
+        evaluatedAt: new Date().toISOString(),
+      };
+
+      // Submit to Firebase
+      await submitEvaluation(newEvaluation);
+      
+      setEvaluations(prev => [...prev, newEvaluation]);
+      addToast(`Evaluation submitted for Team ${selectedTeam.name}!`, 'success');
+      
+      // Reset form
+      setCurrentCriteria({
+        progress: 0,
+        ui: 0,
+        presentation: 0,
+        idea: 0,
+        implementation: 0,
+      });
+      setComments('');
+      setSelectedTeam(null);
+    } catch (error: any) {
+      console.error('Error submitting evaluation:', error);
+      addToast(error.message || 'Failed to submit evaluation', 'error');
+    }
   };
 
   const getTeamEvaluations = (teamId: string, round: JudgingRound) => {
@@ -147,11 +197,20 @@ const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
         animate="visible"
         className="max-w-7xl mx-auto"
       >
-        {/* Header */}
-        <motion.div variants={fadeInUp} className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Jury Portal</h1>
-          <p className="text-slate-400">Welcome, {judge.name}</p>
-          <p className="text-sm text-cyan-400">{judge.designation} at {judge.organization}</p>
+        {/* Header with Logout */}
+        <motion.div variants={fadeInUp} className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Jury Portal</h1>
+            <p className="text-slate-400">Welcome, {judge.name}</p>
+            <p className="text-sm text-cyan-400">{judge.designation} at {judge.organization}</p>
+            <p className="text-xs text-amber-400 mt-1">Jury ID: {judge.juryId}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/30 transition-all"
+          >
+            Logout
+          </button>
         </motion.div>
 
         {/* Mode Toggle */}
@@ -367,46 +426,15 @@ const JuryPortal: React.FC<JuryPortalProps> = ({ teams, currentJudge }) => {
           </motion.div>
         )}
 
-        {/* Judge Panel Info */}
-        <motion.div variants={fadeInUp} className="mt-8 bg-[#100D1C]/50 border border-purple-800/60 rounded-xl p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Jury Panel for {selectedRound}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {mockJudges
-              .filter(j => j.assignedRounds.includes(selectedRound))
-              .map(j => (
-                <div
-                  key={j.id}
-                  className={`p-4 rounded-lg border ${
-                    j.id === judge.id
-                      ? 'border-cyan-400 bg-cyan-500/10'
-                      : 'border-slate-700 bg-slate-800/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    {j.profilePictureUrl ? (
-                      <img src={j.profilePictureUrl} alt={j.name} className="w-12 h-12 rounded-full" />
-                    ) : (
-                      <UserCircleIcon className="w-12 h-12 text-slate-500" />
-                    )}
-                    <div>
-                      <h3 className="font-semibold text-white">{j.name}</h3>
-                      <p className="text-xs text-slate-400">{j.designation}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-400 mb-2">{j.organization}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {j.expertise.map(skill => (
-                      <span
-                        key={skill}
-                        className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </div>
+        {/* Security Note */}
+        <motion.div variants={fadeInUp} className="mt-8 bg-amber-500/10 border border-amber-500/30 rounded-xl p-6">
+          <h2 className="text-xl font-bold text-amber-400 mb-2">🔒 Evaluation Security</h2>
+          <p className="text-slate-300 text-sm">
+            Each jury member can only submit their own evaluations. You cannot edit or view detailed scores from other jury members to maintain evaluation integrity.
+          </p>
+          <p className="text-slate-400 text-xs mt-2">
+            Your Jury ID: <span className="text-cyan-400 font-mono">{judge.juryId}</span> | Assigned Rounds: {judge.assignedRounds.join(', ')}
+          </p>
         </motion.div>
       </motion.div>
     </div>

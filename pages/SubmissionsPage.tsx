@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { mockTeams } from '../services/mockData';
+import { getTeamsWithSubmissions } from '../services/firebaseTeamService';
 import { staggerContainer, fadeInUp } from '../animations/framerVariants';
 import { BookOpenIcon, LinkIcon, TrophyIcon } from '../components/IconComponents';
 import type { Team } from '../types';
@@ -70,11 +70,18 @@ const SubmissionsPage: React.FC = () => {
     const [submittedTeams, setSubmittedTeams] = useState<Team[]>([]);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setSubmittedTeams(mockTeams.filter(team => team.submission));
-            setIsLoading(false);
-        }, 1500); // Simulate network delay
-        return () => clearTimeout(timer);
+        const fetchSubmissions = async () => {
+            try {
+                setIsLoading(true);
+                const teams = await getTeamsWithSubmissions();
+                setSubmittedTeams(teams);
+            } catch (error) {
+                console.error('Error fetching submissions:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchSubmissions();
     }, []);
 
     return (
