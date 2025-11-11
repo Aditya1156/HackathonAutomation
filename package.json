@@ -10,11 +10,12 @@
   },
   "dependencies": {
     "@google/genai": "^1.22.0",
-    "react-dom": "^19.2.0",
-    "react": "^19.2.0",
+    "firebase": "^12.5.0",
     "framer-motion": "^11.3.11",
+    "gsap": "3.12.5",
     "jsqr": "1.4.0",
-    "gsap": "3.12.5"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
