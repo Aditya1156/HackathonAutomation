@@ -5,10 +5,7 @@ import { UsersIcon, CopyIcon, CheckCircleIcon, EyeIcon, UserCircleIcon } from '.
 import { staggerContainer, fadeInUp } from '../animations/framerVariants';
 
 const MemberCard: React.FC<{ member: Team['leader'], isLeader: boolean }> = ({ member, isLeader }) => (
-    <motion.div
-        variants={fadeInUp}
-        className="bg-slate-800/50 p-4 rounded-lg flex items-center space-x-4 relative"
-    >
+    <div className="bg-slate-800/50 p-4 rounded-lg flex items-center space-x-4 relative">
         {isLeader && (
             <div className="absolute -top-2 left-3 px-2 py-0.5 text-xs font-bold text-cyan-300 bg-cyan-900/80 border border-cyan-500/50 rounded-full">
                 LEADER
@@ -32,7 +29,7 @@ const MemberCard: React.FC<{ member: Team['leader'], isLeader: boolean }> = ({ m
                 </div>
             )}
         </div>
-    </motion.div>
+    </div>
 );
 
 const DashboardTeam: React.FC<{ team: Team }> = ({ team }) => {
@@ -45,13 +42,18 @@ const DashboardTeam: React.FC<{ team: Team }> = ({ team }) => {
         setTimeout(() => setIsIdCopied(false), 2000);
     };
 
-    return (
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-8">
-            <motion.div variants={fadeInUp}>
-                 <h1 className="text-3xl font-bold flex items-center"><UsersIcon className="w-8 h-8 mr-3 text-cyan-400"/> My Team</h1>
-            </motion.div>
+    // Add defensive check
+    if (!team || !team.leader) {
+        return <div className="text-white">Loading team data...</div>;
+    }
 
-            <motion.div variants={fadeInUp} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    return (
+        <div className="space-y-8">
+            <div>
+                 <h1 className="text-3xl font-bold flex items-center"><UsersIcon className="w-8 h-8 mr-3 text-cyan-400"/> My Team</h1>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
                     <label className="text-sm text-slate-400">Team ID</label>
                     <div className="flex items-center mt-1">
@@ -78,7 +80,7 @@ const DashboardTeam: React.FC<{ team: Team }> = ({ team }) => {
                         </button>
                      </div>
                 </div>
-            </motion.div>
+            </div>
             
             <div className="space-y-4">
                 <MemberCard member={team.leader} isLeader={true} />
@@ -86,7 +88,7 @@ const DashboardTeam: React.FC<{ team: Team }> = ({ team }) => {
                     <MemberCard key={index} member={member} isLeader={false} />
                 ))}
             </div>
-        </motion.div>
+        </div>
     );
 };
 

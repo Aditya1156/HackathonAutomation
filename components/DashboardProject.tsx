@@ -37,6 +37,11 @@ const DashboardProject: React.FC<{ team: Team }> = ({ team }) => {
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const addToast = useToast();
 
+    // Add defensive check
+    if (!team || !team.githubRepo) {
+        return <div className="text-white">Loading project data...</div>;
+    }
+
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(team.githubRepo);
         addToast('GitHub URL copied to clipboard!', 'info');
@@ -62,17 +67,17 @@ const DashboardProject: React.FC<{ team: Team }> = ({ team }) => {
                 />
             )}
         </AnimatePresence>
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-8">
-            <motion.div variants={fadeInUp}>
+        <div className="space-y-8">
+            <div>
                 <h1 className="text-3xl font-bold flex items-center"><BookOpenIcon className="w-8 h-8 mr-3 text-cyan-400"/> Project Hub</h1>
-            </motion.div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <motion.div variants={fadeInUp} className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
+                <div className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
                     <h2 className="text-xl font-bold mb-4">Synopsis</h2>
                     <p className="text-slate-400">{team.projectSynopsis}</p>
-                </motion.div>
-                <motion.div variants={fadeInUp} className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
+                </div>
+                <div className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
                     <h2 className="text-xl font-bold mb-4">GitHub Repository</h2>
                     <p className="truncate text-cyan-400 mb-4 font-mono">{team.githubRepo.replace('https://github.com/', '')}</p>
                     <div className="flex space-x-2">
@@ -83,10 +88,10 @@ const DashboardProject: React.FC<{ team: Team }> = ({ team }) => {
                            <CopyIcon className="w-5 h-5" /> Copy
                         </button>
                     </div>
-                </motion.div>
+                </div>
             </div>
 
-            <motion.div variants={fadeInUp} className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
+            <div className="bg-[#100D1C]/50 border border-purple-800/60 p-6 rounded-xl">
                 <h2 className="text-xl font-bold mb-4 flex items-center">
                     <TrophyIcon className="w-6 h-6 mr-3 text-cyan-400"/> Final Submission
                 </h2>
@@ -107,8 +112,8 @@ const DashboardProject: React.FC<{ team: Team }> = ({ team }) => {
                         Submit Project
                     </motion.button>
                 </form>
-            </motion.div>
-        </motion.div>
+            </div>
+        </div>
         </>
     );
 };

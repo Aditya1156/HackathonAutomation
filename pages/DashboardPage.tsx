@@ -7,6 +7,7 @@ import DashboardTeam from '../components/DashboardTeam';
 import DashboardProject from '../components/DashboardProject';
 import DashboardChat from '../components/DashboardChat';
 import DashboardResources from '../components/DashboardResources';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export type DashboardView = 'overview' | 'team' | 'project' | 'chat' | 'resources';
 
@@ -54,7 +55,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ team, onLogout }) => {
       <div className="flex flex-col md:flex-row gap-8">
         <DashboardSidebar activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
         <main className="flex-1 min-w-0">
-          {renderContent()}
+          <ErrorBoundary key={activeView}>
+            {renderContent()}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

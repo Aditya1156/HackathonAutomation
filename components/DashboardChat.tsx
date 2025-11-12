@@ -23,7 +23,18 @@ const DashboardChat: React.FC<{ team: Team }> = () => {
     return () => {
       if (mentorTimeoutRef.current) {
         clearTimeout(mentorTimeoutRef.current);
+        mentorTimeoutRef.current = null;
       }
+    };
+  }, []);
+
+  // Add isMounted ref to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
     };
   }, []);
 
@@ -39,14 +50,18 @@ const DashboardChat: React.FC<{ team: Team }> = () => {
     // Clear any existing timeout
     if (mentorTimeoutRef.current) {
       clearTimeout(mentorTimeoutRef.current);
+      mentorTimeoutRef.current = null;
     }
     
     // Simulate mentor response
     setIsMentorTyping(true);
     mentorTimeoutRef.current = setTimeout(() => {
-      const mentorResponse: Message = { from: 'mentor', text: 'That\'s a great question! Let me think about that for a moment...', time: currentTime };
-      setMessages(prev => [...prev, mentorResponse]);
-      setIsMentorTyping(false);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        const mentorResponse: Message = { from: 'mentor', text: 'That\'s a great question! Let me think about that for a moment...', time: currentTime };
+        setMessages(prev => [...prev, mentorResponse]);
+        setIsMentorTyping(false);
+      }
       mentorTimeoutRef.current = null;
     }, 2000);
   };
